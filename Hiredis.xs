@@ -3,7 +3,7 @@
 #include "XSUB.h"
 
 #include "ppport.h"
-#include "r_heartbeat.h"
+#include "heartbeat.h"
 #include "hiredis/hiredis.h"
 #include "pthread.h"
 
