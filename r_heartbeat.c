@@ -25,10 +25,10 @@ rhb_thread_loop(void *arg)
             /* time_to_wait.tv_nsec +=  */
         }
 
-        pthread_mutex_lock(&hb->access_mutex);
-        rc = pthread_cond_timedwait(&hb->cmd_cond_var, &hb->access_mutex, &time_to_wait);
+        pthread_mutex_lock(&hb->cmd_mutex);
+        rc = pthread_cond_timedwait(&hb->cmd_condvar, &hb->cmd_mutex, &time_to_wait);
         if (rc == ETIMEDOUT) { /* timeout => perform heartbeat */
-            pthread_mutex_unlock(&hb->access_mutex);
+            pthread_mutex_unlock(&hb->cmd_mutex);
             printf("Performing heartbeat\n");
             (*hb->application_callback)(hb->application_state, RCMD_TIMER);
             time_to_wait.tv_sec = 0; /* trigger resetting the timer */
@@ -36,7 +36,7 @@ rhb_thread_loop(void *arg)
         else if (rc == 0) { /* command received */
             cmd = hb->command;
             hb->command = RCMD_NONE;
-            pthread_mutex_unlock(&hb->access_mutex);
+            pthread_mutex_unlock(&hb->cmd_mutex);
 
             switch (cmd) {
             case RCMD_NONE:
@@ -89,8 +89,8 @@ rhb_create( rheartbeat_t **hb,
     h->application_state = app_state;
     h->application_callback = app_callback;
 
-    pthread_mutex_init(&h->access_mutex, NULL);
-    pthread_cond_init(&h->cmd_cond_var, NULL);
+    pthread_mutex_init(&h->cmd_mutex, NULL);
+    pthread_cond_init(&h->cmd_condvar, NULL);
 
     return 0;
 }
@@ -115,8 +115,8 @@ rhb_finish(rheartbeat_t *hb)
     int rc = 0;
     rhb_send_cmd(hb, RCMD_HALT, 1);
     rc = pthread_join(hb->heartbeat_thread, NULL);
-    pthread_mutex_destroy(&hb->access_mutex);
-    pthread_cond_destroy(&hb->cmd_cond_var);
+    pthread_mutex_destroy(&hb->cmd_mutex);
+    pthread_cond_destroy(&hb->cmd_condvar);
     return rc;
 }
 
@@ -124,15 +124,15 @@ rhb_finish(rheartbeat_t *hb)
 int
 rhb_send_cmd(rheartbeat_t *hb, r_command_t cmd, r_option_t flags)
 {
-    pthread_mutex_lock(&hb->access_mutex);
+    pthread_mutex_lock(&hb->cmd_mutex);
     if (!(flags & RCMD_OPT_FORCE) && hb->command != RCMD_NONE) {
         printf("hb command is %i\n", hb->command);
-        pthread_mutex_unlock(&hb->access_mutex);
+        pthread_mutex_unlock(&hb->cmd_mutex);
         return 1;
     }
     hb->command = cmd;
-    pthread_cond_signal(&hb->cmd_cond_var);
-    pthread_mutex_unlock(&hb->access_mutex);
+    pthread_cond_signal(&hb->cmd_condvar);
+    pthread_mutex_unlock(&hb->cmd_mutex);
 
     return 0;
 }

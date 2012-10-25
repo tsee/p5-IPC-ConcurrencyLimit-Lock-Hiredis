@@ -19,8 +19,8 @@ typedef void (*r_app_callback_t)(r_app_state_ptr_t app_state, r_command_t cmd);
 
 typedef struct rheartbeat {
     pthread_t heartbeat_thread;
-    pthread_mutex_t access_mutex;
-    pthread_cond_t cmd_cond_var; 
+    pthread_mutex_t cmd_mutex;
+    pthread_cond_t cmd_condvar; 
     r_command_t command;
     unsigned int interval; /* hb interval in s */
     r_app_state_ptr_t application_state;
