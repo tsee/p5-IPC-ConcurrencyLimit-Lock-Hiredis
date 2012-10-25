@@ -15,6 +15,8 @@ rhb_thread_loop(void *arg)
     r_command_t cmd;
     int rc;
 
+    (*hb->application_callback)(hb->application_state, RCMD_INIT);
+
     time_to_wait.tv_sec = 0;
     while (1) {
         if (time_to_wait.tv_sec == 0) {

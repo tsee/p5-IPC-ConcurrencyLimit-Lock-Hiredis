@@ -6,8 +6,9 @@
 typedef int r_command_t;
 #define RCMD_NONE 0
 #define RCMD_TIMER 1
-#define RCMD_HALT 2
-#define RCMD_PING 3
+#define RCMD_INIT 2
+#define RCMD_HALT 3
+#define RCMD_PING 4
 
 typedef int r_option_t;
 #define RCMD_OPT_NORM   0
