@@ -28,6 +28,7 @@ rhb_thread_loop(void *arg)
         if (rc == ETIMEDOUT) { /* timeout => perform heartbeat */
             pthread_mutex_unlock(&hb->access_mutex);
             printf("Performing heartbeat\n");
+            (*hb->application_callback)(hb->application_state, RCMD_TIMER);
             time_to_wait.tv_sec = 0; /* trigger resetting the timer */
         }
         else if (rc == 0) { /* command received */
@@ -37,14 +38,24 @@ rhb_thread_loop(void *arg)
 
             switch (cmd) {
             case RCMD_NONE:
-                printf("Got NONE cmd!\n");
+                /* printf("Got NONE cmd!\n"); */
+                (*hb->application_callback)(hb->application_state, cmd);
                 break;
             case RCMD_HALT:
                 printf("Got HALT cmd!\n");
+                (*hb->application_callback)(hb->application_state, cmd);
                 goto cleanup;
                 break;
             case RCMD_PING:
                 printf("Got PING cmd!\n");
+                break;
+            default:
+                if (cmd < 16) {
+                    printf("Got cmd reserved for HB internals! ERROR.\n");
+                    break;
+                }
+                printf("Got OTHER cmd (%i)!\n", cmd);
+                (*hb->application_callback)(hb->application_state, cmd);
                 break;
             }
         }
@@ -61,7 +72,10 @@ rhb_thread_loop(void *arg)
 
 
 int
-rhb_create(rheartbeat_t **hb, unsigned int hb_interval_ms)
+rhb_create( rheartbeat_t **hb,
+            unsigned int hb_interval_ms,
+            r_app_state_ptr_t app_state,
+            r_app_callback_t app_callback)
 {
     rheartbeat_t *h;
     h = (rheartbeat_t *)malloc(sizeof(rheartbeat_t));
@@ -70,6 +84,8 @@ rhb_create(rheartbeat_t **hb, unsigned int hb_interval_ms)
     *hb = h;
     h->interval = hb_interval_ms;
     h->command  = RCMD_NONE;
+    h->application_state = app_state;
+    h->application_callback = app_callback;
 
     pthread_mutex_init(&h->access_mutex, NULL);
     pthread_cond_init(&h->cmd_cond_var, NULL);
@@ -104,7 +120,7 @@ rhb_finish(rheartbeat_t *hb)
 
 
 int
-rhb_send_cmd(rheartbeat_t *hb, r_command_t cmd, int flags)
+rhb_send_cmd(rheartbeat_t *hb, r_command_t cmd, r_option_t flags)
 {
     pthread_mutex_lock(&hb->access_mutex);
     if (!(flags & RCMD_OPT_FORCE) && hb->command != RCMD_NONE) {

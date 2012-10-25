@@ -7,6 +7,11 @@
 #include "hiredis/hiredis.h"
 #include "pthread.h"
 
+void empty_app_callback (r_app_state_ptr_t app_state, r_command_t cmd)
+{
+}
+
+
 MODULE = IPC::ConcurrencyLimit::Lock::Hiredis		PACKAGE = IPC::ConcurrencyLimit::Lock::Hiredis
 
 rheartbeat_t *
@@ -15,7 +20,7 @@ new(CLASS)
   PREINIT:
     int rc;
   CODE:
-    rc = rhb_create(&RETVAL, 1);
+    rc = rhb_create(&RETVAL, 1, NULL, &empty_app_callback);
     if (rc != 0)
       croak("Failed to create heartbeat");
     rhb_execute(RETVAL);

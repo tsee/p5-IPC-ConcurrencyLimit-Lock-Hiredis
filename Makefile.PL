@@ -1,5 +1,27 @@
 use 5.008001;
 use ExtUtils::MakeMaker;
+use strict;
+use warnings;
+use Config qw(%Config);
+
+my $OPTIMIZE;
+my $defines = join " ", map "-D$_", grep exists $ENV{$_},
+              qw(DEBUG NDEBUG);
+
+if ($Config{gccversion}) {
+    $OPTIMIZE = '-O3 -Wall -W';
+} elsif ($Config{osname} eq 'MSWin32') {
+    $OPTIMIZE = '-O2 -W4';
+} else {
+    $OPTIMIZE = $Config{optimize};
+}
+
+if ($ENV{DEBUG}) {
+  $OPTIMIZE .= ' -g';
+}
+else {
+  $defines .= " -DNDEBUG";
+}
 # See lib/ExtUtils/MakeMaker.pm for details of how to influence
 # the contents of the Makefile that is written.
 WriteMakefile(
@@ -19,8 +41,11 @@ WriteMakefile(
       (ABSTRACT_FROM  => 'lib/IPC/ConcurrencyLimit/Lock/Hiredis.pm', # retrieve abstract from module
        AUTHOR         => 'Steffen Mueller <smueller@cpan.org>') : ()),
     LIBS              => ['-lrt'], # e.g., '-lm'
-    DEFINE            => '', # e.g., '-DHAVE_SOMETHING'
+    DEFINE            => $defines, # e.g., '-DHAVE_SOMETHING'
     INC               => '-I.', # e.g., '-I. -I/usr/include/other'
         # Un-comment this if you add C files to link with later:
+    OPTIMIZE          => $OPTIMIZE,
     OBJECT            => '$(O_FILES)', # link all the C files too
 );
+$ENV{OPTIMIZE} = $OPTIMIZE;
+
