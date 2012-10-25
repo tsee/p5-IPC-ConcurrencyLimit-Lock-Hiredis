@@ -9,4 +9,29 @@
 
 MODULE = IPC::ConcurrencyLimit::Lock::Hiredis		PACKAGE = IPC::ConcurrencyLimit::Lock::Hiredis
 
+rheartbeat_t *
+new(CLASS)
+    char *CLASS;
+  PREINIT:
+    int rc;
+  CODE:
+    rc = rhb_create(&RETVAL, 1);
+    if (rc != 0)
+      croak("Failed to create heartbeat");
+    rhb_execute(RETVAL);
+  OUTPUT: RETVAL
+
+void
+ping_thread(hb)
+    rheartbeat_t *hb
+  CODE:
+    rhb_send_cmd(hb, RCMD_PING, RCMD_OPT_NORM);
+
+void
+DESTROY(hb)
+    rheartbeat_t *hb;
+  CODE:
+    /*warn("foo");*/
+    rhb_finish(hb);
+
 
