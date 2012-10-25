@@ -38,6 +38,7 @@ typedef struct heartbeat {
 
     unsigned int interval; /* hb interval in s, firing HBCMD_TIMER every so often */
 
+    pthread_mutex_t app_state_mutex;
     hb_app_state_ptr_t application_state; /* user-defined app state */
     hb_app_callback_t application_callback; /* user-defined hb app callback */
 } heartbeat_t;
@@ -49,5 +50,13 @@ int hb_create(heartbeat_t **hb,
 int hb_execute(heartbeat_t *hb);
 int hb_finish(heartbeat_t *hb);
 int hb_send_cmd(heartbeat_t *hb, hb_command_t cmd, hb_option_t flags);
+
+static inline int hb_app_state_lock(heartbeat_t *hb) {
+    return pthread_mutex_lock(&hb->app_state_mutex);
+}
+
+static inline int hb_app_state_unlock(heartbeat_t *hb) {
+    return pthread_mutex_unlock(&hb->app_state_mutex);
+}
 
 #endif

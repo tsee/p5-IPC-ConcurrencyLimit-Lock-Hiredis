@@ -7,6 +7,16 @@
 #include <error.h>
 #include <errno.h>
 
+#define STMT_START	do
+#define STMT_END	while (0)
+
+#define APP_CALLBACK(hb, cmd)                                           \
+    STMT_START {                                                        \
+        pthread_mutex_lock(&(hb)->app_state_mutex);                     \
+        (*(hb)->application_callback)((hb)->application_state, (cmd));  \
+        pthread_mutex_unlock(&(hb)->app_state_mutex);                   \
+    } STMT_END
+
 static void *
 hb_thread_loop(void *arg)
 {
@@ -15,7 +25,7 @@ hb_thread_loop(void *arg)
     hb_command_t cmd;
     int rc;
 
-    (*hb->application_callback)(hb->application_state, HBCMD_INIT);
+    APP_CALLBACK(hb, HBCMD_INIT);
 
     time_to_wait.tv_sec = 0;
     while (1) {
@@ -30,7 +40,7 @@ hb_thread_loop(void *arg)
         if (rc == ETIMEDOUT) { /* timeout => perform heartbeat */
             pthread_mutex_unlock(&hb->cmd_mutex);
             printf("Performing heartbeat\n");
-            (*hb->application_callback)(hb->application_state, HBCMD_TIMER);
+            APP_CALLBACK(hb, HBCMD_TIMER);
             time_to_wait.tv_sec = 0; /* trigger resetting the timer */
         }
         else if (rc == 0) { /* command received */
@@ -41,11 +51,10 @@ hb_thread_loop(void *arg)
             switch (cmd) {
             case HBCMD_NONE:
                 /* printf("Got NONE cmd!\n"); */
-                (*hb->application_callback)(hb->application_state, cmd);
                 break;
             case HBCMD_HALT:
                 printf("Got HALT cmd!\n");
-                (*hb->application_callback)(hb->application_state, cmd);
+                APP_CALLBACK(hb, HBCMD_HALT);
                 goto cleanup;
                 break;
             case HBCMD_PING:
@@ -57,7 +66,7 @@ hb_thread_loop(void *arg)
                     break;
                 }
                 printf("Got OTHER cmd (%i)!\n", cmd);
-                (*hb->application_callback)(hb->application_state, cmd);
+                APP_CALLBACK(hb, cmd);
                 break;
             }
         }
@@ -90,6 +99,7 @@ hb_create( heartbeat_t **hb,
     h->application_callback = app_callback;
 
     pthread_mutex_init(&h->cmd_mutex, NULL);
+    pthread_mutex_init(&h->app_state_mutex, NULL);
     pthread_cond_init(&h->cmd_condvar, NULL);
 
     return 0;
@@ -116,6 +126,7 @@ hb_finish(heartbeat_t *hb)
     hb_send_cmd(hb, HBCMD_HALT, 1);
     rc = pthread_join(hb->heartbeat_thread, NULL);
     pthread_mutex_destroy(&hb->cmd_mutex);
+    pthread_mutex_destroy(&hb->app_state_mutex);
     pthread_cond_destroy(&hb->cmd_condvar);
     return rc;
 }
