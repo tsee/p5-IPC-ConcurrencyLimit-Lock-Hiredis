@@ -1,7 +1,7 @@
 # from "perlobject.map"  Dean Roehrich, version 19960302
 
 # O_OBJECT	-> link an opaque C or C++ object to a blessed Perl object.
-rheartbeat_t * O_OBJECT
+heartbeat_t * O_OBJECT
 
 ######################################################################
 OUTPUT

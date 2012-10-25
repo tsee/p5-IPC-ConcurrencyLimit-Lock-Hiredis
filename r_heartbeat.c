@@ -8,14 +8,14 @@
 #include <errno.h>
 
 static void *
-rhb_thread_loop(void *arg)
+hb_thread_loop(void *arg)
 {
-    rheartbeat_t *hb = (rheartbeat_t *)arg;
+    heartbeat_t *hb = (heartbeat_t *)arg;
     struct timespec time_to_wait;
-    r_command_t cmd;
+    hb_command_t cmd;
     int rc;
 
-    (*hb->application_callback)(hb->application_state, RCMD_INIT);
+    (*hb->application_callback)(hb->application_state, HBCMD_INIT);
 
     time_to_wait.tv_sec = 0;
     while (1) {
@@ -30,29 +30,29 @@ rhb_thread_loop(void *arg)
         if (rc == ETIMEDOUT) { /* timeout => perform heartbeat */
             pthread_mutex_unlock(&hb->cmd_mutex);
             printf("Performing heartbeat\n");
-            (*hb->application_callback)(hb->application_state, RCMD_TIMER);
+            (*hb->application_callback)(hb->application_state, HBCMD_TIMER);
             time_to_wait.tv_sec = 0; /* trigger resetting the timer */
         }
         else if (rc == 0) { /* command received */
             cmd = hb->command;
-            hb->command = RCMD_NONE;
+            hb->command = HBCMD_NONE;
             pthread_mutex_unlock(&hb->cmd_mutex);
 
             switch (cmd) {
-            case RCMD_NONE:
+            case HBCMD_NONE:
                 /* printf("Got NONE cmd!\n"); */
                 (*hb->application_callback)(hb->application_state, cmd);
                 break;
-            case RCMD_HALT:
+            case HBCMD_HALT:
                 printf("Got HALT cmd!\n");
                 (*hb->application_callback)(hb->application_state, cmd);
                 goto cleanup;
                 break;
-            case RCMD_PING:
+            case HBCMD_PING:
                 printf("Got PING cmd!\n");
                 break;
             default:
-                if (cmd < 16) {
+                if (cmd <= HBCMD_LAST) {
                     printf("Got cmd reserved for HB internals! ERROR.\n");
                     break;
                 }
@@ -74,18 +74,18 @@ rhb_thread_loop(void *arg)
 
 
 int
-rhb_create( rheartbeat_t **hb,
+hb_create( heartbeat_t **hb,
             unsigned int hb_interval_ms,
-            r_app_state_ptr_t app_state,
-            r_app_callback_t app_callback)
+            hb_app_state_ptr_t app_state,
+            hb_app_callback_t app_callback)
 {
-    rheartbeat_t *h;
-    h = (rheartbeat_t *)malloc(sizeof(rheartbeat_t));
+    heartbeat_t *h;
+    h = (heartbeat_t *)malloc(sizeof(heartbeat_t));
     if (h == NULL)
         return 1;
     *hb = h;
     h->interval = hb_interval_ms;
-    h->command  = RCMD_NONE;
+    h->command  = HBCMD_NONE;
     h->application_state = app_state;
     h->application_callback = app_callback;
 
@@ -97,23 +97,23 @@ rhb_create( rheartbeat_t **hb,
 
 
 int
-rhb_execute(rheartbeat_t *hb)
+hb_execute(heartbeat_t *hb)
 {
     int rc = 0;
     pthread_attr_t attr;
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-    rc = pthread_create(&hb->heartbeat_thread, &attr, &rhb_thread_loop, (void *)hb);
+    rc = pthread_create(&hb->heartbeat_thread, &attr, &hb_thread_loop, (void *)hb);
     pthread_attr_destroy(&attr);
     return rc;
 }
 
 
 int
-rhb_finish(rheartbeat_t *hb)
+hb_finish(heartbeat_t *hb)
 {
     int rc = 0;
-    rhb_send_cmd(hb, RCMD_HALT, 1);
+    hb_send_cmd(hb, HBCMD_HALT, 1);
     rc = pthread_join(hb->heartbeat_thread, NULL);
     pthread_mutex_destroy(&hb->cmd_mutex);
     pthread_cond_destroy(&hb->cmd_condvar);
@@ -122,10 +122,10 @@ rhb_finish(rheartbeat_t *hb)
 
 
 int
-rhb_send_cmd(rheartbeat_t *hb, r_command_t cmd, r_option_t flags)
+hb_send_cmd(heartbeat_t *hb, hb_command_t cmd, hb_option_t flags)
 {
     pthread_mutex_lock(&hb->cmd_mutex);
-    if (!(flags & RCMD_OPT_FORCE) && hb->command != RCMD_NONE) {
+    if (!(flags & HBCMD_OPT_FORCE) && hb->command != HBCMD_NONE) {
         printf("hb command is %i\n", hb->command);
         pthread_mutex_unlock(&hb->cmd_mutex);
         return 1;
