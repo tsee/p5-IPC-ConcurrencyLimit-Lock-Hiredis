@@ -54,8 +54,11 @@ ping_thread(hb)
 void
 DESTROY(hb)
     heartbeat_t *hb;
+  PREINIT:
+    hiredis_hb_data_t *d;
   CODE:
-    /*warn("foo");*/
     hb_finish(hb);
+    d = (hiredis_hb_data_t *)hb->application_state;
+    redisFree(d->redis_cxt);
 
 
